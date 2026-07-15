@@ -1620,16 +1620,14 @@
     .demo-pill {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
       margin-left: 8px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.16);
-      color: var(--on-primary);
-      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--red);
+      color: #fff;
+      font-size: 0.62rem;
       font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+      letter-spacing: 0.06em;
       vertical-align: middle;
     }
     body.demo-mode .topnav { top: 40px; }
@@ -1895,10 +1893,7 @@
     (function() {
       try {
         var DEMO = window.location.pathname.includes('demo');
-        if (DEMO) {
-          // Demo always needs onboarding
-          document.documentElement.classList.add('needs-onboarding');
-        } else {
+        if (!DEMO) {
           var d = JSON.parse(localStorage.getItem('savingsTrackerData_v1.0') || 'null');
           if (!d || !d.setupComplete) {
             document.documentElement.classList.add('needs-onboarding');
@@ -1915,7 +1910,7 @@
   <!-- ======= DEMO UPGRADE BANNER & MODAL ======= -->
   <div id="demo-banner" class="demo-banner" style="display: none;">
     <div class="demo-banner-content">
-      <span>You're viewing a preview - changes won't be saved.</span>
+      <span>✦ This is a live demo — data resets on refresh</span>
       <a href="https://www.etsy.com/shop/DigihubPlanners" target="_blank" class="demo-banner-link">Get Full Access →</a>
     </div>
   </div>
@@ -2001,7 +1996,7 @@
       </div>
       <div class="setup-footer">
         <span class="material-symbols-outlined">lock</span>
-        <p>Preview data resets on refresh. No account required.</p>
+        <p>All data is saved locally. No account required.</p>
       </div>
     </div>
   </div>
@@ -2010,7 +2005,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-app-avatar"><div class="app-initial" id="sidebar-app-initial">S</div></div>
-      <h2 class="app-name" id="sidebar-app-name">Savings Planner <span class="demo-pill">Demo</span></h2>
+      <h2 class="app-name" id="sidebar-app-name">Savings Planner <span class="demo-pill">DEMO</span></h2>
       <div class="couple-countdown" id="sidebar-countdown">
         <span class="material-symbols-outlined" style="font-size:12px">schedule</span>
         <span id="countdown-text">Calculating...</span>
@@ -3129,6 +3124,7 @@
 
     function resetDemoData() {
       if (!isDemoMode) return;
+      sessionStorage.clear();
       loadDemoSampleData();
       renderPage(state.currentPage);
       showToast('Sample data reloaded', 'success');
@@ -3136,7 +3132,6 @@
 
     // ─── PERSISTENCE ──────────────────────────────────────
     function save() {
-      if (isDemoMode) return;
       const payload = {
         userName: state.userName,
         startDate: state.startDate instanceof Date ? state.startDate.toISOString().slice(0, 10) : state.startDate,
@@ -3149,16 +3144,18 @@
         currentPage: state.currentPage
       };
       if (isDemoMode) {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        return;
       }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }
 
     function loadStateFromStorage() {
       try {
-        if (isDemoMode) return false;
-        const raw = isDemoMode ? sessionStorage.getItem(STORAGE_KEY) : localStorage.getItem(STORAGE_KEY);
+        if (isDemoMode) {
+          loadDemoSampleData();
+          return true;
+        }
+        const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
           return false;
         }
@@ -3625,14 +3622,14 @@
       loadStateFromStorage();
       const setupScreen = $('setup-screen');
       if (isDemoMode) {
-        loadDemoSampleData();
-        setupScreen.classList.add('hidden');
+        state.setupComplete = true;
+        if (setupScreen) setupScreen.classList.add('hidden');
         document.documentElement.classList.remove('needs-onboarding');
         updateSidebarAndHeader();
         renderPage('dashboard');
         return;
       }
-      if (!state.setupComplete) {
+      if (!state.setupComplete || isDemoMode) {
         setupScreen.classList.remove('hidden');
         initOnboardingCanvas();
         runSetupIntroAnimation();
@@ -3649,7 +3646,16 @@
       const initial = state.userName[0]?.toUpperCase() || 'S';
       $('sidebar-app-initial').textContent = initial;
       $('topnav-avatar').textContent = initial;
-      $('sidebar-app-name').innerHTML = `${state.userName}'s Savings <span class="demo-pill">Demo</span>`;
+      const sidebarName = $('sidebar-app-name');
+      if (sidebarName) {
+        sidebarName.textContent = state.userName + "'s Savings";
+        if (isDemoMode) {
+          const pill = document.createElement('span');
+          pill.className = 'demo-pill';
+          pill.textContent = 'DEMO';
+          sidebarName.append(' ', pill);
+        }
+      }
     }
 
     // ─── DASHBOARD ────────────────────────────────────────
@@ -5054,6 +5060,7 @@
     }
 
     function processImportData(data, merge = false) {
+      if (isDemoMode) { openDemoModal(); return; }
       if (!data.goals) { showToast('Invalid backup. Goals not found.', 'error'); return; }
       if (merge) {
         data.goals.forEach(imported => {
